@@ -5,7 +5,7 @@
 #include <SDL.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "../include/stb_image.h"
+#include "../stb_image.h"
 
 void scc(int code) {
     if (code > 0) {
