@@ -49,9 +49,9 @@ void render_char(SDL_Renderer *renderer, SDL_Texture *font, char c, Vec2f pos, U
     };
     scc(SDL_SetTextureColorMod(
             font, 
-            (color >> (8 * 2)) & 0xff,
+            (color >> (8 * 0)) & 0xff,
             (color >> (8 * 1)) & 0xff,
-            (color >> (8 * 0)) & 0xff));
+            (color >> (8 * 2)) & 0xff));
     scc(SDL_RenderCopy(renderer, font, &src, &dst));
 }
 
