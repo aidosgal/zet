@@ -7,7 +7,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include "la.h"
+#include "vector.h"
 
 #define FONT_ROWS 7 
 #define FONT_COLS 18 
