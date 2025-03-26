@@ -150,6 +150,9 @@ int main(void) {
                         buffer_cursor = buffer_size;
                     }
                 }
+                case SDLK_PLUS: {
+                    
+                }
                 }
             } break;
                 
