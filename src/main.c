@@ -15,6 +15,7 @@
 #define FONT_HEIGHT 64 
 #define FONT_CHAR_WIDTH (FONT_WIDTH / FONT_COLS)
 #define FONT_CHAR_HEIGHT (FONT_HEIGHT / FONT_ROWS)
+#define FONT_SCALE 5
 
 void scc(int code) {
     if (code > 0) {
@@ -97,13 +98,32 @@ SDL_Surface *surface_from_file(const char *file_path) {
 #define BUFFER_CAPACITY 1024
 
 char buffer[BUFFER_CAPACITY];
+size_t buffer_cursor = 0;
 size_t buffer_size = 0;
+
+#define UNHEX(color)                             \
+    ((color) >> (8 * 0)) & 0xFF,                \
+    ((color) >> (8 * 1)) & 0xFF,                \
+    ((color) >> (8 * 2)) & 0xFF,                \
+    ((color) >> (8 * 3)) & 0xFF
+
+void render_cursor(SDL_Renderer *renderer, Uint32 color) {
+    SDL_Rect rect = {
+        .x = (int) floorf(buffer_cursor * FONT_CHAR_WIDTH * FONT_SCALE),
+        .y = 0,
+        .w = FONT_CHAR_WIDTH * FONT_SCALE,
+        .h = FONT_CHAR_HEIGHT * FONT_SCALE,
+    };
+
+    scc(SDL_SetRenderDrawColor(renderer, UNHEX(color)));
+    scc(SDL_RenderFillRect(renderer, &rect));
+}
 
 int main(void) {
     scc(SDL_Init(SDL_INIT_VIDEO));
 
     SDL_Window *window = 
-        scp(SDL_CreateWindow("Zet", 0, 0, 800, 600, 
+        scp(SDL_CreateWindow("Zet", 0, 0, 800, 600,
                 SDL_WINDOW_RESIZABLE));
 
     SDL_Renderer *renderer = 
@@ -127,6 +147,7 @@ int main(void) {
                 case SDLK_BACKSPACE: {
                     if (buffer_size > 0) {
                         buffer_size -= 1;
+                        buffer_cursor = buffer_size;
                     }
                 }
                 }
@@ -140,6 +161,7 @@ int main(void) {
                 }
                 memcpy(buffer + buffer_size, event.text.text, text_size);
                 buffer_size += text_size;
+                buffer_cursor = buffer_size;
             } break;
 
             }
@@ -148,7 +170,8 @@ int main(void) {
         scc(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0));
         scc(SDL_RenderClear(renderer));
 
-        render_text_sized(renderer, font_texture, buffer, vec2f(0.0, 0.0), 0xFFFFFFFF, 5.0f, buffer_size);
+        render_text_sized(renderer, font_texture, buffer, vec2f(0.0, 0.0), 0xFFFFFFFF, FONT_SCALE, buffer_size);
+        render_cursor(renderer, 0xFFFFFFFF);
 
         SDL_RenderPresent(renderer);
     }
