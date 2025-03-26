@@ -55,14 +55,16 @@ void render_char(SDL_Renderer *renderer, SDL_Texture *font, char c, Vec2f pos, U
     scc(SDL_RenderCopy(renderer, font, &src, &dst));
 }
 
-void render_text(SDL_Renderer *renderer, SDL_Texture *font, const char *text, Vec2f pos, Uint32 color, float scale) {
-    size_t n = strlen(text);
-
+void render_text_sized(SDL_Renderer *renderer, SDL_Texture *font, const char *text, Vec2f pos, Uint32 color, float scale, size_t text_size) {
     Vec2f pen = pos;
-    for(size_t i = 0; i < n; ++i) {
+    for(size_t i = 0; i < text_size; ++i) {
         render_char(renderer, font, text[i], pen, color, scale);
         pen.x += FONT_CHAR_WIDTH * scale;
     }
+}
+
+void render_text(SDL_Renderer *renderer, SDL_Texture *font, const char *text, Vec2f pos, Uint32 color, float scale) {
+    render_text_sized(renderer, font, text, pos, color, scale, strlen(text));
 }
 
 SDL_Surface *surface_from_file(const char *file_path) {
@@ -92,6 +94,11 @@ SDL_Surface *surface_from_file(const char *file_path) {
     return scp(SDL_CreateRGBSurfaceFrom((void*)pixels, w, h, depth, pitch, rmask, gmask, bmask, amask));
 }
 
+#define BUFFER_CAPACITY 1024
+
+char buffer[BUFFER_CAPACITY];
+size_t buffer_size = 0;
+
 int main(void) {
     scc(SDL_Init(SDL_INIT_VIDEO));
 
@@ -114,13 +121,34 @@ int main(void) {
             case SDL_QUIT: {
                 quit = true;
             } break;
+                
+            case SDL_KEYDOWN: {
+                switch (event.key.keysym.sym) {
+                case SDLK_BACKSPACE: {
+                    if (buffer_size > 0) {
+                        buffer_size -= 1;
+                    }
+                }
+                }
+            } break;
+                
+            case SDL_TEXTINPUT: {
+                size_t text_size = strlen(event.text.text);
+                const size_t free_space = BUFFER_CAPACITY - buffer_size;
+                if (text_size > free_space) {
+                    text_size = free_space;
+                }
+                memcpy(buffer + buffer_size, event.text.text, text_size);
+                buffer_size += text_size;
+            } break;
+
             }
         }
 
         scc(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0));
         scc(SDL_RenderClear(renderer));
 
-        render_text(renderer, font_texture, "Hello, World!", vec2f(0.0, 0.0), 0xFF0000FF, 5.0f);
+        render_text_sized(renderer, font_texture, buffer, vec2f(0.0, 0.0), 0xFFFFFFFF, 5.0f, buffer_size);
 
         SDL_RenderPresent(renderer);
     }
