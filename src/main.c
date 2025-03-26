@@ -7,6 +7,8 @@
 #include <SDL_ttf.h>
 #include "font.h"
 #include "vector.h"
+#include "rope.h"
+
 #define BUFFER_CAPACITY 1024
 #define FONT_SIZE 24
 
@@ -23,7 +25,7 @@ int main(void) {
         SDL_Quit();
         return 1;
     }
-    SDL_Window *window = SDL_CreateWindow("Text Editor", 
+    SDL_Window *window = SDL_CreateWindow("Zet", 
                                           SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
                                           800, 600, SDL_WINDOW_SHOWN);
     if (!window) {
