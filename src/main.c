@@ -2,183 +2,116 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
+#include <GL/glew.h>
 #include <SDL.h>
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include <SDL_ttf.h>
+#include "font.h"
 #include "vector.h"
-
-#define FONT_ROWS 7 
-#define FONT_COLS 18 
-#define FONT_WIDTH 128 
-#define FONT_HEIGHT 64 
-#define FONT_CHAR_WIDTH (FONT_WIDTH / FONT_COLS)
-#define FONT_CHAR_HEIGHT (FONT_HEIGHT / FONT_ROWS)
-#define FONT_SCALE 5
-
-void scc(int code) {
-    if (code > 0) {
-        fprintf(stderr, "SDL ERROR: %s\n", SDL_GetError());
-        exit(1);
-    }
-}
-
-void *scp(void *ptr) {
-    if (ptr == NULL) {
-        fprintf(stderr, "SDL ERROR: %s\n", SDL_GetError());
-        exit(1);
-    }
-
-    return ptr;
-}
-
-void render_char(SDL_Renderer *renderer, SDL_Texture *font, char c, Vec2f pos, Uint32 color, float scale) {
-    const size_t index = c - 32;
-    const size_t col = index % FONT_COLS;
-    const size_t row = index / FONT_COLS;
-    const SDL_Rect src = {
-        .x = col * FONT_CHAR_WIDTH, .y = row * FONT_CHAR_HEIGHT,
-        .w = FONT_CHAR_WIDTH,
-        .h = FONT_CHAR_HEIGHT,
-    };
-    const SDL_Rect dst = {
-        .x = (int) floorf(pos.x), 
-        .y = (int) floorf(pos.y),
-        .w = (int) floorf(FONT_CHAR_WIDTH * scale),
-        .h = (int) floorf(FONT_CHAR_HEIGHT * scale),
-    };
-    scc(SDL_SetTextureColorMod(
-            font, 
-            (color >> (8 * 0)) & 0xff,
-            (color >> (8 * 1)) & 0xff,
-            (color >> (8 * 2)) & 0xff));
-    scc(SDL_RenderCopy(renderer, font, &src, &dst));
-}
-
-void render_text_sized(SDL_Renderer *renderer, SDL_Texture *font, const char *text, Vec2f pos, Uint32 color, float scale, size_t text_size) {
-    Vec2f pen = pos;
-    for(size_t i = 0; i < text_size; ++i) {
-        render_char(renderer, font, text[i], pen, color, scale);
-        pen.x += FONT_CHAR_WIDTH * scale;
-    }
-}
-
-void render_text(SDL_Renderer *renderer, SDL_Texture *font, const char *text, Vec2f pos, Uint32 color, float scale) {
-    render_text_sized(renderer, font, text, pos, color, scale, strlen(text));
-}
-
-SDL_Surface *surface_from_file(const char *file_path) {
-    int w, h, n;
-    unsigned char *pixels = stbi_load(file_path, &w, &h, &n, STBI_rgb_alpha);
-    if (pixels == NULL) {
-        fprintf(stderr, "ERROR: could not load file %s: %s\n", 
-                file_path, SDL_GetError());
-        exit(1);
-    }
-
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-    const Uint32 rmask = 0xff000000;
-    const Uint32 gmask = 0x00ff0000;
-    const Uint32 bmask = 0x0000ff00;
-    const Uint32 amask = 0x000000ff;
-#else 
-    const Uint32 rmask = 0x000000ff;
-    const Uint32 gmask = 0x0000ff00;
-    const Uint32 bmask = 0x00ff0000;
-    const Uint32 amask = 0xff000000;
-#endif
-
-    int depth = 32;
-    int pitch = 4*w;
-    
-    return scp(SDL_CreateRGBSurfaceFrom((void*)pixels, w, h, depth, pitch, rmask, gmask, bmask, amask));
-}
-
 #define BUFFER_CAPACITY 1024
+#define FONT_SIZE 24
 
 char buffer[BUFFER_CAPACITY];
 size_t buffer_cursor = 0;
 size_t buffer_size = 0;
 
-#define UNHEX(color)                             \
-    ((color) >> (8 * 0)) & 0xFF,                \
-    ((color) >> (8 * 1)) & 0xFF,                \
-    ((color) >> (8 * 2)) & 0xFF,                \
-    ((color) >> (8 * 3)) & 0xFF
-
-void render_cursor(SDL_Renderer *renderer, Uint32 color) {
-    SDL_Rect rect = {
-        .x = (int) floorf(buffer_cursor * FONT_CHAR_WIDTH * FONT_SCALE),
-        .y = 0,
-        .w = FONT_CHAR_WIDTH * FONT_SCALE,
-        .h = FONT_CHAR_HEIGHT * FONT_SCALE,
-    };
-
-    scc(SDL_SetRenderDrawColor(renderer, UNHEX(color)));
-    scc(SDL_RenderFillRect(renderer, &rect));
-}
-
 int main(void) {
-    scc(SDL_Init(SDL_INIT_VIDEO));
-
-    SDL_Window *window = 
-        scp(SDL_CreateWindow("Zet", 0, 0, 800, 600,
-                SDL_WINDOW_RESIZABLE));
-
-    SDL_Renderer *renderer = 
-        scp(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED));
-    
-    SDL_Surface *font_surface = surface_from_file("./assets/charmap-oldschool_white.png");
-
-    SDL_Texture *font_texture = SDL_CreateTextureFromSurface(renderer, font_surface);
-
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        fprintf(stderr, "SDL could not initialize! SDL Error: %s\n", SDL_GetError());
+        return 1;
+    }
+    if (!init_font_system()) {
+        SDL_Quit();
+        return 1;
+    }
+    SDL_Window *window = SDL_CreateWindow("Text Editor", 
+                                          SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
+                                          800, 600, SDL_WINDOW_SHOWN);
+    if (!window) {
+        fprintf(stderr, "Window could not be created! SDL Error: %s\n", SDL_GetError());
+        close_font_system();
+        SDL_Quit();
+        return 1;
+    }
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    if (!renderer) {
+        fprintf(stderr, "Renderer could not be created! SDL Error: %s\n", SDL_GetError());
+        SDL_DestroyWindow(window);
+        close_font_system();
+        SDL_Quit();
+        return 1;
+    }
+    TTF_Font *font = TTF_OpenFont("./assets/font/IosevkaNerdFontMono-Regular.ttf", FONT_SIZE);
+    if (!font) {
+        fprintf(stderr, "Failed to load font! SDL_ttf Error: %s\n", TTF_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        close_font_system();
+        SDL_Quit();
+        return 1;
+    }
+    SDL_Color textColor = {255, 255, 255, 255};
     bool quit = false;
-    while(!quit) {
-        SDL_Event event = {0};
-        while(SDL_PollEvent(&event)) {
+
+    while (!quit) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
             switch (event.type) {
-            case SDL_QUIT: {
+            case SDL_QUIT:
                 quit = true;
-            } break;
+                break;
                 
-            case SDL_KEYDOWN: {
-                switch (event.key.keysym.sym) {
-                case SDLK_BACKSPACE: {
+            case SDL_KEYDOWN:
+                if (event.key.keysym.sym == SDLK_BACKSPACE) {
                     if (buffer_size > 0) {
-                        buffer_size -= 1;
+                        buffer_size--;
+                        buffer[buffer_size] = '\0';
                         buffer_cursor = buffer_size;
                     }
                 }
-                case SDLK_PLUS: {
-                    
-                }
-                }
-            } break;
+                break;
                 
-            case SDL_TEXTINPUT: {
-                size_t text_size = strlen(event.text.text);
-                const size_t free_space = BUFFER_CAPACITY - buffer_size;
-                if (text_size > free_space) {
-                    text_size = free_space;
+            case SDL_TEXTINPUT:
+                if (buffer_size < BUFFER_CAPACITY - 1) {
+                    buffer[buffer_size] = event.text.text[0];
+                    buffer_size++;
+                    buffer[buffer_size] = '\0';
+                    buffer_cursor = buffer_size;
                 }
-                memcpy(buffer + buffer_size, event.text.text, text_size);
-                buffer_size += text_size;
-                buffer_cursor = buffer_size;
-            } break;
-
+                break;
             }
         }
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
 
-        scc(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0));
-        scc(SDL_RenderClear(renderer));
+        SDL_Rect textPosition = {0, 0, 0, 0};
+        render_text_ttf(renderer, font, buffer, textColor, &textPosition);
 
-        render_text_sized(renderer, font_texture, buffer, vec2f(0.0, 0.0), 0xFFFFFFFF, FONT_SCALE, buffer_size);
-        render_cursor(renderer, 0xFFFFFFFF);
+        int cursor_x = 0;
+        char temp_buffer[BUFFER_CAPACITY];
+        strncpy(temp_buffer, buffer, buffer_cursor);
+        temp_buffer[buffer_cursor] = '\0';
 
+        SDL_Surface* surface = TTF_RenderText_Solid(font, temp_buffer, textColor);
+        if (surface) {
+            cursor_x = surface->w;
+            SDL_FreeSurface(surface);
+        }
+
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_Rect cursorRect = {
+            cursor_x,
+            0,  
+            2,
+            TTF_FontHeight(font)
+        };
+        SDL_RenderFillRect(renderer, &cursorRect);
         SDL_RenderPresent(renderer);
     }
 
+    TTF_CloseFont(font);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    close_font_system();
     SDL_Quit();
     return 0;
 }

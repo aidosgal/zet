@@ -1,5 +1,10 @@
-CFLAGS=-Wall -Wextra -std=c11 -pedantic -ggdb `pkg-config --cflags sdl2`
-LIBS=`pkg-config --libs sdl2`
+CFLAGS=-Wall -Wextra -std=c11 -pedantic -ggdb $(shell sdl2-config --cflags)
+LIBS=$(shell sdl2-config --libs) -lSDL2_ttf -lm
 
-zet: src/main.c
-	$(CC) $(CFLAGS) -I. -o ./zet src/main.c src/vector.c $(LIBS) -lm
+zet: src/main.c src/vector.c src/font.c
+	$(CC) $(CFLAGS) -Isrc -o ./zet src/main.c src/vector.c src/font.c $(LIBS)
+
+clean:
+	rm -f ./zet
+
+.PHONY: clean
